@@ -1,0 +1,11 @@
+{
+  "name": "sat-search-server",
+  "version": "1.0.0",
+  "main": "sat-search-server.js",
+  "license": "MIT",
+  "dependencies": {
+    "body-parser": "^1.18.3",
+    "commander": "^2.19.0",
+    "express": "^4.16.4"
+  }
+}

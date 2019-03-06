@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <style>
+    img {
+      width: 300px;
+      margin-bottom: 30px;
+      display: block;
+    }
+
+    #selected-results {
+      position: fixed;
+      right: 20px;
+      top: 20px;
+      height: 100%;
+      overflow-y: scroll;
+    }
+  </style>
+</head>
+
+<body>
+  <div>
+    <div>
+      <select id="tile-filter"></select>
+    </div>
+
+    <div>
+      <div id="results"></div>
+      <div id="selected-results">
+        <div>Selected tiles</div>
+        <button id="save-results-trigger">Download results</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://d3js.org/d3.v5.min.js"></script>
+  <script>
+    d3.json("/results").then(function (data) {
+      var selectedFeatures = [];
+
+      var resultsGroupedByTile = d3.nest()
+        .key(function (d) { return "row:" + d.properties["eo:row"] + " col:" + d.properties["eo:column"]; })
+        .entries(data.features);
+
+      d3.select("#tile-filter")
+        .on("change", function () {
+          var selectedTileKey = d3.select('#tile-filter').property('value');
+          var filteredResults = selectedTileKey === "all" ?
+            data.features :
+            resultsGroupedByTile.filter(function (tile) {
+              return tile.key === selectedTileKey;
+            })[0].values;
+
+          d3.selectAll(".result").remove();
+
+          renderResults(filteredResults)
+        })
+        .selectAll("option")
+        .data([{ "key": "all" }].concat(resultsGroupedByTile))
+        .enter()
+        .append("option")
+        .text(function (d) { return d.key });
+
+      d3.select("#save-results-trigger")
+        .on("click", function () {
+          var featureCollection = Object.assign({}, data);
+          featureCollection.features = selectedFeatures;
+          console.log(featureCollection)
+          fetch('/saveResults', {
+            method: 'post',
+            body: JSON.stringify(featureCollection)
+          })
+        });
+
+      renderResults(data.features);
+
+      function renderResults(features) {
+        var results = d3.select("#results")
+          .selectAll("div")
+          .data(features);
+
+        results.enter()
+          .append("div")
+          .attr("class", "result")
+          .text(function (d) { return d.properties.datetime })
+          .append("img")
+          .attr("class", "thumbnail")
+          .attr("src", function (d) {
+            return d.assets.thumbnail.href;
+          })
+          .on("click", addSelectedResult);
+      }
+
+      function addSelectedResult(feature) {
+        if (d3.select("#selected-results").select("#" + feature.id).empty()) {
+          selectedFeatures.push(feature);
+
+          d3.select("#selected-results")
+            .append("div")
+            .attr("id", feature.id)
+            .append("img")
+            .attr("src", feature.assets.thumbnail.href)
+            .on("click", removeSelectedResult.bind(this, feature));
+        }
+      }
+
+      function removeSelectedResult(feature) {
+        selectedFeatures = selectedFeatures.filter(function (f) { return f.id !== feature.id; })
+        d3.select("#selected-results").select("#" + feature.id).remove();
+      }
+    });
+  </script>
+</body>
+
+</html>
